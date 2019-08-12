@@ -1,0 +1,298 @@
+\documentclass[a4paper]{article}
+
+\usepackage{array}
+\usepackage{listings}
+\usepackage{appendix}
+
+\title{USGS Collection 1 Reformatting tests and comparisons}
+\date{December 14 2018}
+\author{Josh Sixsmith}
+
+\begin{document}
+  \pagenumbering{gobble}
+  \maketitle
+  \newpage
+  \pagenumbering{arabic}
+
+  \section{Introduction}
+
+    \begin{flushleft}
+    The Level-1 Collection-1 data from USGS are distributed as compressed tarballs \textit{*.tar.gz} and will be used as the primary input for producing Geoscience Australia's Landsat Collection-3. \par
+    The purpose of the distribution format was to reduce the size of the data stream users were downloading whilst maintaining backwards compatibility for the individual TIFF files. As such, this report is not to highlight issues with the distribution format, instead it is to make Geoscience Australia aware of the limitations the original downloaded format will have on its production processing system. \par
+    The tarballs are compressed as a single stream using gunzip. This presents an issue in random access of the TIFF files, with the full tarball stream requiring decompression before allowing random access on a TIFF file. \par
+    Initial testing of the original downloaded files proved to be usable, but extremly slow to process. Unpacking the data is not suitable on the infrastructure we're using for processing, as it significantly increases the storage use in terms of both size and number of files. \par
+    The aim of this report is to test and compare different package structures whilst keeping as close as possible to the original format and structure of the files distributed by the USGS and provide GA with the information required to make an informed decision regarding the operational status of the USGS Collection-1 archive.
+    \end{flushleft}
+
+  \section{Method}
+
+    The original tarballs will be unpacked and compressed using GDAL and repacked using the following container formats:
+
+    \begin{itemize}
+      \item *.tar
+      \item *.tar.gz
+      \item *.zip
+    \end{itemize}
+
+    \begin{flushleft}
+    The TIFF files will compressed using the deflate algorithm, comparing aggression levels 6 and 9, and a chunksize of (256, 256). A full matrix of combinations of chunksize and aggression levels won't be evaluated, as we aren't testing for extreme performance or extreme compression. Merely a good balance beteen the two, whilst still providing a file format that can be easily interpreted by a general user with the need for specialist tools. \par
+    The reformatted versions, \textit{*.tar} and \textit{*.tar.gz} have gone through the exact same image compression settings \textit{[deflate, level=9, chunks=(256, 256)]}, and the text files with no compression. \par
+    The reformatted \textit{tar.gz} was compressed with \textit{level=0}, meaning we’ll zip the tar file, but apply no compression. These files will contain additional metadata in the file headers specific to the gzip settings.  Hence the file size is only slightly larger; 793.535 vs 793.656.
+    \end{flushleft}
+
+  \section{Results}
+
+  \subsection{Acquisition test (metadata loading)}
+
+    \begin{flushleft}
+    The original \textit{*.tar.gz} files took on average 1 minute and 21 seconds to read the metadata and build an Acquisition Python Class that provides direct I/O access to an image file. I would go so far to say that this structure is useless for operational purposes on our current environment. \par
+    The reformatted \textit{*.tar} files can now be read in $<$ 1 second, whereas the reformatted \textit{*.tar.gz} files took nearly 7 seconds. This indicates that there is a significant overhear purely from gzip being applied to the tar container, even though an aggression level of 0, i.e.\ no compression, was used on the container itself. \par
+    \end{flushleft}
+
+    \begin{table}[h!]
+      \caption{Package size, Parsing time, and parsing time relative to original}
+      \begin{tabular}{|c|c|c|c|}
+      \hline
+      \textbf{Format Type} & \textbf{Package Size} & \textbf{Parsing Time} & \textbf{Time \% of original} \\ \hline
+      Original *.tar.gz & 945MB & 81.12 seconds & 100\% \\ \hline
+      Reformatted *.tar.gz & 794MB & 06.71 seconds & 8.27\% \\ \hline
+      Reformatted *.tar & 794MB & 00.14 seconds & 0.17\% \\ \hline
+      \end{tabular}
+    \end{table}
+
+  \subsection{Production processing test: wagl}
+
+    \begin{flushleft}
+    28 Landsat 8 scenes were selected for use in testing a production run.  The test was run at NCI Australia, using a normal Broadwell node (28 CPU’s, 64GB). \par
+    For an additional comparison, the imagery were compressed with deflate level 6.  It is anticipated that there will be no significant overhead in reading data from deflate level 6 compared to deflate level 9. \par
+    The test was merely to see how long it takes to run wagl over the different versions of archive reformatting, and produce NBAR/NBART. \par
+
+    The different archive formats are:
+    \end{flushleft}
+
+    \begin{itemize}
+      \item Original \textit{tar.gz} from USGS
+      \begin{itemize}
+        \item The imagery is compressed by gunzip, not GDAL, thus not allowing random access
+        \item Total storage size for the \textit{tar.gz’s}:
+          \begin{itemize}
+            \item 27201244 bytes (26GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 03:06:17
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 17:56:32
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 108.67
+          \end{itemize}
+      \end{itemize}
+      \item Reformatted \textit{tar.gz}
+      \begin{itemize}
+        \item The imagery is compressed by GDAL with deflate 9, and the tarball itself is compressed with deflate 0
+        \item Total storage size for the 28 \textit{tar.gz’s}:
+          \begin{itemize}
+            \item 22427016 bytes (22GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 01:07:18
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 13:05:24
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 39.26
+          \end{itemize}
+      \end{itemize}
+      \item Reformatted \textit{tar.gz}
+      \begin{itemize}
+        \item The imagery is compressed by GDAL with deflate 6, and the tarball itself is compressed with deflate 0
+        \item Total storage size for the \textit{tar.gz’s}:
+          \begin{itemize}
+            \item 22448736 bytes (22GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 01:09:06
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 12:37:15
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 40.31
+          \end{itemize}
+      \end{itemize}
+      \item Reformatted \textit{tar} with image chunk size (256, 256)
+      \begin{itemize}
+        \item The imagery is compressed by GDAL with deflate 6 with a chunk size of (256, 256), and contained in a tar (no gzip over the top of the tar)
+        \item Total storage size for the \textit{tar’s}:
+          \begin{itemize}
+            \item 22445280 bytes (22GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 00:23:51
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 09:15:11
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 13.91
+          \end{itemize}
+      \end{itemize}
+      \item Reformatted \textit{zip} with image chunk size (256, 256)
+      \begin{itemize}
+        \item The imagery is compressed by GDAL with deflate 6, and contained in a zip archive using the \textit{ZIP\_STORED} setting (no compression)
+        \item Total storage size for the \textit{zip’s}:
+          \begin{itemize}
+            \item 22444908 bytes (22GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 00:38:25
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 11:54:10
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 22.41
+          \end{itemize}
+      \end{itemize}
+      \item Unpacked original \textit{tar.gz}
+      \begin{itemize}
+        \item Unpack the original \textit{tar.gz} and nothing else
+        \item Total storage size:
+          \begin{itemize}
+            \item 50983272 (49GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 00:39:08
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 11:01:48
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 22.83
+          \end{itemize}
+      \end{itemize}
+      \item Reformatted \textit{tar} with image chunk size of (512, 512)
+      \begin{itemize}
+        \item The imagery is compressed by GDAL with deflate 6 with a chunk size of (512, 512), and contained in a \textit{.tar} (no gzip over the top of the tar)
+        \item Total storage size:
+          \begin{itemize}
+            \item 22435732 bytes (22GB)
+          \end{itemize}
+        \item Walltime:
+          \begin{itemize}
+            \item 00:33:11
+          \end{itemize}
+        \item CPU Time:
+          \begin{itemize}
+            \item 09:16:58
+          \end{itemize}
+        \item Service Units:
+          \begin{itemize}
+            \item 19.36
+          \end{itemize}
+      \end{itemize}
+    \end{itemize}
+
+  \clearpage
+
+    \begin{table}[ht!]
+      \caption{Comparison of Storage Size, Walltime, CPU Time and Service Units}
+      \begin{tabular}{|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|} \hline
+        \textbf{Format Type} & \textbf{Total Storage Size (bytes)} & \textbf{Walltime} & \textbf{CPU Time} & \textbf{Service Units} \\ \hline
+        Original *.tar.gz & 27,201,244 & 03:06:17 & 17:56:32 & 108.67 \\ \hline
+        Unpacked original *.tar.gz & 50,983,272 & 00:39:08 & 11:01:48 & 22.83 \\ \hline
+        Reformatted *.tar (chunk (256, 256)) & 22,445,280 & 00:23:51 & 09:15:11 & 13.91 \\ \hline
+        Reformatted *.tar.gz (deflate 6) & 22,448,736 & 01:09:06 & 12:37:15 & 40.31 \\ \hline
+        Reformatted *.tar.gz (deflate 9) & 22,427,016 & 01:07:18 & 13:05:24 & 39.26 \\ \hline
+        Reformatted *.zip & 22,444,908 & 00:38:25 & 11:54:10 & 22.41 \\ \hline
+        Reformatted *.tar (chunk (512, 512)) & 22,435,732 & 00:33:11 & 09:16:58 & 19.36 \\ \hline
+      \end{tabular}
+    \end{table}
+
+    \begin{table}[ht!]
+      \caption{Relative Comparison of Storage Size, Walltime, CPU Time and Service Units}
+      \begin{tabular}{|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|>{\centering\arraybackslash}m{20mm}|} \hline
+        \textbf{Format Type} & \textbf{Total Storage Size (bytes)} & \textbf{Walltime} & \textbf{CPU Time} & \textbf{Service Units} \\ \hline
+        Original *.tar.gz & 100\% & 100\% & 100\% & 100\% \\ \hline
+        Unpacked original *.tar.gz & 187.43\% & 21.00\% & 61.48\% & 21.00\% \\ \hline
+        Reformatted *.tar (chunk (256, 256)) & 82.52\% & 12.80\% & 51.57\% & 12.80\% \\ \hline
+        Reformatted *.tar.gz (deflate 6) & 82.53\% & 37.09\% & 70.34\% & 37.09\% \\ \hline
+        Reformatted *.tar.gz (deflate 9) & 82.45\% & 36.13\% & 72.96\% & 36.13\% \\ \hline
+        Reformatted *.zip & 82.51\% & 20.62\% & 66.34\% & 20.62\% \\ \hline
+        Reformatted *.tar (chunk (512, 512)) & 82.48\% & 17.81\% & 51.74\% & 17.81\% \\ \hline
+      \end{tabular}
+    \end{table}
+
+  \clearpage
+  \section{Summary}
+    \begin{flushleft}
+    Restructuring the '\textit{.tar.gz}' files into a different container and compressing the imagery using GDAL decreased the filesize by approximately 16\%, thus reducing our on-going storage costs.
+    The reformatted “tar.gz” deflate level 6 and 9 didn’t show any significant differences in compute costs. Thus I would recommend using deflate level 9, in order to gain the most from disk space savings.
+    
+    The reformatted \textit{*.tar} files, in this test, appear to be the most effective at reducing the computational cost. The reformatted \textit{*.tar.gz} files appear to incur a significant overhead cost in reading the data, hence the increased computational time. The only difference between the \textit{*.tar} and the reformatted \textit{*.tar.gz} is the additional compression (deflate level 0) of the tar. \par
+    The unpacked \textit{*.tar.gz} files, resulting in directories with uncompressed TIFF files, was significantly better in terms of computation cost than the original \textit{*.tar.gz} files. However, the tilling regime is row by row, resulting in significantly more reads than the tiled TIFF files. Additional work could be done on the wagl api side to improve reads by catering for non-native block reads, or more likely reading multiples of native block sizes. The other complexity is the increased disk space usage, by temporarily storing the full uncompressed archive, which would impede large scale production. \par
+    The comparison of chunk sizes (256, 256) vs (512, 512), saw some slight differences. The (512, 512) had a slightly smaller storage size, opposite to previous tests. Whereas the (256, 256) operated slightly faster. Keep in mind that this is a small sample for testing, and if required, repeated runs between these two setting could be processed and evaluated. \par
+    I would recommend that we reformat our Landsat Level-1 archive, from a compressed archive, to utilising compression within the TIFF itself, and storing in an archive/tarball with no compression i.e.  \textit{*.tar} only. The TIFF’s should be compressed using a chunk size of (256, 256) using deflate level 9. \par
+    I do recognise that the \textit{tar} format doesn’t support lengthy member names (unlike zip), as well as the fact that this format will differ to USGS’s standard distribution format. \par
+    Some users might come into issue with the compressed GeoTIFF’s, but most image processing packages these days have no problem in handling compressed GeoTIFF’s (especially if using the deflate filer). \par
+    For Windows users, the \textit{.tar} format is supported by tools such as WinZip, and 7Zip. From that perspective, any user making use of the standard USGS format will have no issues here, in effect it’ll be 1 less operation, i.e no unzipping of the “tar.gz”, then unpacking the “.tar”. \par
+    The items addressed above will only come into effect for those users who download GA’s flavour of USGS Level-1 data. Our internal systems will handle the files without issue. \par
+    The goal here is to reduce the cost of operational processing, in terms of KSU and time taken. Backlog processing could be achieved in quicker timeframes. As well as reducing the storage cost for the Level-1 data by /~16/%. 
+    \end{flushleft}
+    
+  \appendix
+  \section{Parsing Metadata Performance Experiment (Python)}
+
+    \begin{lstlisting}[language=Python]
+    
+      >>> orig_fname = 'LC08_L1TP_090091_20170819_20180203_01_T2.tar.gz'
+      >>> refmt_tar_fname = 'LC08_L1TP_090091_20170819_20180203_01_T2.tar'
+      >>> refmt_targz_fname = 'LC08_L1TP_090091_20170819_20180203_01_T2.tar.gz'
+      >>> def tictoc(fname):
+      ...     st = datetime.datetime.now()
+      ...     c = acquisitions(fname)
+      ...     et = datetime.datetime.now()
+      ...     print(et - st)
+      ...  
+      >>> tictoc(refmt_tar_fname)
+      0:00:00.142707
+      >>> tictoc(refmt_targz_fname)
+      0:00:06.714195
+      >>> tictoc(orig_fname)
+      0:01:21.124626
+      >>> orig_stat = os.stat(orig_fname)
+      >>> refmt_tar_stat = os.stat(refmt_tar_fname)
+      >>> refmt_targz_stat = os.stat(refmt_targz_fname)
+      >>> orig_stat.st_size / 1024 / 1024
+      945.9611234664917
+      >>> refmt_tar_stat.st_size / 1024 / 1024          
+      793.53515625
+      >>> refmt_targz_stat.st_size / 1024 / 1024
+      793.6562995910645
+      >>> 1 - (refmt_tar_stat.st_size / orig_stat.st_size)
+      0.16113343713103556
+      >>> 1 - (refmt_targz_stat.st_size / orig_stat.st_size)
+      0.16100537336809728
+    \end{lstlisting}
+
+\end{document}
