@@ -50,7 +50,7 @@
 
   \subsection{Aerosol type}
     \begin{flushleft}
-      The aerosol type is not enabled from the command line; instead, a simple boolean switch has been implemented that specifies that an acquisition or given a set of acquisitions is to be processed via the water atmospheric correction method instead. Internally, the workflow will then use a Maritime Navy model. This behaviour could be changed, enabling a user to specify 1 of several supported aerosol models. \par
+      The aerosol type is not enabled from the command line; instead, a simple boolean switch has been implemented that specifies that an acquisition or given a set of acquisitions is to be processed via the water atmospheric correction method instead. Internally, the workflow will then use a Maritime Navy model for both MODTRAN 6 and MODTRAN 5.4. This behaviour could be changed, enabling a user to specify 1 of several supported aerosol models. \par
       For a production system to be designed and implemented, a logical process needs to be defined that enables automatic processing with a given aerosol. i.e. how does one determine the aerosol model for use within the workflow process? \par
       A quick solution is simply to pre-define locations to specifically use a given aerosol model. Considering the short time frames involved, the simplest approach is to process a batch job where a user specifies what model to use for each batch of processing.
     \end{flushleft}
@@ -79,6 +79,7 @@
     \clearpage
 
       Prior to convolution, both the data and the kernel are padded to an optimal size in both the x and y directions. The pad size is determined in two steps, 1. half the kernel size in each dimension + 1, 2. Find the next optimal power of 2 to enable an efficient Fourier transform. The actual padding method is \textit{symmetric} for the data and \textit{constant} for the kernel. \par
+      To provide an idea of what each padding method results in, consider the following array [1, 2, 3, 4, 5] and pad by a width of [2, 2]. The \textit{symmetric} method returns [2, 1, 1, 2, 3, 4, 5, 5, 4] while the \textit{constant} method returns [0, 0, 1, 2, 3, 4, 5, 0, 0]. \par
       The convolution process, depending on the dimensions of the array and the resolution, can be very time-consuming. For example, processing a (10980, 10980) image with a (141, 141) kernel took approximately 50 minutes. So for Sentinel-2, there would be an additional three images of the same dimensions to process. The current design of the workflow isn't geared towards parallelising a single function; rather, it is geared towards parallelising across acquisitions (process more acquisitions at once). \par
       As the PSF is designed to be radially symmetric, we've also enabled convolution to occur via Fourier. This has significantly reduced the computational time, at the expense of more system memory. Processing the same image example would take approximately 3 minutes via the Fourier method.
     \end{flushleft}
@@ -107,7 +108,8 @@
     \end{equation}
 
     \begin{flushleft}
-      Equation~\ref{eq:2} yielded results that were slightly closer to the sample dataset, but still not the same. Despite the difference in results, equation~\ref{eq:2} has been implemented and is in use by the workflow.
+      Equation~\ref{eq:2} yielded results that were slightly closer to the sample dataset, but still not the same. Despite the difference in results, equation~\ref{eq:2} has been implemented and is in use by the workflow. \par
+      If users want to apply sun glint correction themselves, the necessary angular datasets will be available within the product package. However, the resolution will be 30 metres for Landsat and 20 metres for Sentinel-2. To correct the higher-resolution channels, users will need to resample.
     \end{flushleft}
 
   \section{Outputs}
