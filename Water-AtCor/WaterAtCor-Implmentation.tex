@@ -32,8 +32,8 @@
 
     \begin{flushleft}
       This document provides a brief overview of the implementation of atmospheric correction over water surfaces. The implementation is based on information provided in \url{https://www.mssanz.org.au/modsim2017/G9/li.pdf}. \par
-      The alogrithm and workflow has been implemented into the \textit{wagl} codebase (\url{https://www.github.com/GeoscienceAustralia/wagl}). A key component to the algorithmic implementation is the deriviation and application of a point spread function representing the atmosphere. \par
-      The PSF is applied via image convolution and depending on the resolution of the image, a kernel representing the PSF could be very large. This can present an issue for a production system when using standard image convolution. As such two methods of convolution were implemented and both versions will be compared and discussed.
+      The algorithm and workflow has been implemented into the \textit{wagl} codebase (\url{https://www.github.com/GeoscienceAustralia/wagl}). A key component to the algorithmic implementation is the derivation and application of a point spread function representing the atmosphere. \par
+      The PSF is applied via image convolution, and depending on the resolution of the image, a kernel representing the PSF could be very large. This can present an issue for a production system when using standard image convolution. As such, two methods of convolution were implemented, and both versions will be compared and discussed.
     \end{flushleft}
 
   \section{Implementation details}
@@ -41,25 +41,25 @@
   \subsection{Derivation of the atmospheric PSF}
 
     \begin{flushleft}
-      We have been supplied a build of MODTRAN (version 5.4) that has been internally modified in order in order to output the atmosheric PSF. \par
-      The wagl codebase makes use of MODTRAN 6.0, and rather than fallback to using MODTRAN 5.4, it was decided to keep using MODTRAN 6.0 for the radiative transfer component, and only use MODTRAN 5.4 for retrieving the PSF. \par
-      The supplied version of MODTRAN 5.4 was further modified in order to output the channel names that a given PSF refers to. This enabled a simpler workflow that relied on no assumptions about a given sensor, or for the channel ordering. The outputs are still appended to the TP7 file. \par
-      The PSF is read and stored (along with all the outputs produced by wagl) in a HDF5 file, as well as the 2D kernel representing the PSF. \par
-      The stored kernel is not normalised, but is normalised during the convolution process.
+      We have been supplied a build of MODTRAN (version 5.4) that has been internally modified in order in order to output the atmospheric PSF. \par
+      The wagl codebase makes use of MODTRAN 6.0, and rather than fall back to using MODTRAN 5.4, it was decided to keep using MODTRAN 6.0 for the radiative transfer component, and only use MODTRAN 5.4 for retrieving the PSF. \par
+      The supplied version of MODTRAN 5.4 was further modified in order to output the channel names that a calculated PSF refers to. The modification enabled a simpler workflow that relied on no assumptions about a given sensor, or for the channel order. The outputs are still appended to the TP7 file. \par
+      The PSF is read and stored (along with all the outputs produced by wagl) in an HDF5 file, as well as the 2D kernel representing the PSF. \par
+      The kernel is stored unnormalised; however, it is normalised during the convolution process.
     \end{flushleft}
 
   \subsection{Aerosol type}
     \begin{flushleft}
-      The aerosol type is not enable from the command line, rather a simple boolean switch has be implemented that specifies that an acquisition or given set of acquisitions is to be processed via the water atmospheric correction method instead. Internally, the workflow will then use a Maritime Navy model. This behaviour could be changed enabling a user to specify 1 of several supported aerosol models. \par
-      In order for a production system to be designed and implemented, a logical process needs to be defined that enables automatic processing with a given aerosol. i.e. how does one determine the aerosol model to be used? \par
-      A quick solution is simply to pre-define locations to specifically use a given aerosol model. Considering the short time frames involved, it may be easier to run in bulk and a user simply specifies what model to use for each batch of processing.
+      The aerosol type is not enabled from the command line; instead, a simple boolean switch has been implemented that specifies that an acquisition or given a set of acquisitions is to be processed via the water atmospheric correction method instead. Internally, the workflow will then use a Maritime Navy model. This behaviour could be changed, enabling a user to specify 1 of several supported aerosol models. \par
+      For a production system to be designed and implemented, a logical process needs to be defined that enables automatic processing with a given aerosol. i.e. how does one determine the aerosol model for use within the workflow process? \par
+      A quick solution is simply to pre-define locations to specifically use a given aerosol model. Considering the short time frames involved, the simplest approach is to process a batch job where a user specifies what model to use for each batch of processing.
     \end{flushleft}
 
   \subsection{Convolution (and preperation for)}
 
     \begin{flushleft}
-      Convolution does not work effectively if the data contains null values. In order to get around this, run length (or row length) averages are calculated and used as a fill value. This is a cheap and easy method to implement and compute, however, under certain conditions may not capture correctly the spatial variability nor the context. Alternate methods such as spatial neighbourhood averaging have not been tested, but like anything, will require thorough testing and evaluation. \par
-      We did uncover an issue regarding image acquistions that don't have a tight bounding box around the data extent, i.e.\ full rows of null data located at the top and bottom of the image. We now handle this issue by reducing the image to a tight bounding box prior to convolution, and insert the result into the full array dimensions in order to preserve the orginial extent. \par
+      Convolution does not work effectively if the data contains null values. To avoid a null data issue, run length (or row length) averages are calculated and used as a fill value. This is a cheap and easy method to implement and compute; however, under certain conditions may not capture the spatial variability nor the context correctly. Alternate methods, such as spatial neighbourhood averaging have not been tested, but like anything, will require thorough testing and evaluation. \par
+      We did uncover an issue regarding image acquisitions that don't have a tight bounding box around the data extent, i.e.\ full rows of null data located at the top and bottom of the image. We now handle this issue by reducing the image to a tight bounding box before convolution and insert the result into the full array dimensions to preserve the original extent. \par
 
     \begin{figure}[h!]
       \centering
@@ -67,7 +67,7 @@
       \includegraphics[scale=0.30]{non-tight-bounding-box.png}
     \end{figure}
 
-      However, if a row of null data happens to occur inbetween two valid rows, we call this phenomena non-sequential and raise an Exception in order to stop the process. We don't anticipate coming across many acquisitions, if any at all. So we felt it best to simply stop the process and record the acquisition id for future investigation. \par
+      However, if a row of null data happens to occur between two valid rows, we call this phenomenon non-sequential and raise an Exception to stop the process. We don't anticipate coming across many acquisitions if any at all. So we felt it best to stop the process and record the acquisition id for future investigation. \par
 
     \begin{figure}[h!]
       \hspace*{-1.0cm}
@@ -79,16 +79,16 @@
     \clearpage
 
       Prior to convolution, both the data and the kernel are padded to an optimal size in both the x and y directions. The pad size is determined in two steps, 1. half the kernel size in each dimension + 1, 2. Find the next optimal power of 2 to enable an efficient Fourier transform. The actual padding method is \textit{symmetric} for the data and \textit{constant} for the kernel. \par
-      The convolution process, depending on the dimensions of the array and the resolution, can be very time consuming. For example, processing an (10980, 10980) image with a (141, 141) kernel took approximately 50 minutes. So for Sentinel-2, there would be an additional 3 images of the same dimensions to process. The current design of the workflow isn't geared towards parallelising a single function, rather it is geared towards parallelising across acquisitions (process more acquisitions at once). \par
-      As the PSF is designed to be radially symetric, we've also enabled convolution to occur via fouier. This has significantly reduced the computational time, at the expense of more system memory. Processing the same image example would take approxiamtely 3 minutes via the fourier method.
+      The convolution process, depending on the dimensions of the array and the resolution, can be very time-consuming. For example, processing a (10980, 10980) image with a (141, 141) kernel took approximately 50 minutes. So for Sentinel-2, there would be an additional three images of the same dimensions to process. The current design of the workflow isn't geared towards parallelising a single function; rather, it is geared towards parallelising across acquisitions (process more acquisitions at once). \par
+      As the PSF is designed to be radially symmetric, we've also enabled convolution to occur via Fourier. This has significantly reduced the computational time, at the expense of more system memory. Processing the same image example would take approximately 3 minutes via the Fourier method.
     \end{flushleft}
 
   \subsection{Glint correction}
 
     \begin{flushleft}
-      While the paper that the implementations was based of included both a sun and sky glint correction. In consultation with Team Wombats, we have only implemented sky glint correction as an appropriate source of wind speed data has not been identified, as well as the fact that more work is required to develop an appropriate method that accounts for the high spatial variability of wind speed. \par
-      As for sky glint correction, a value of 1.34 for the refractive water index has been hard coded. If it is desireable for this value to be changed by a user at the command line, this can be implemented. Alternatively, wagl can be used as a standard Python module, and a user can call the functions separately and define a value for the refractive water index as a keyword argument. \par
-      We were provided with outputs from a sample dataset to use as a comparison, but we were unable to get a satisfiably close value on a simple image difference. As such, we then turned to the sample code that was provided and found that there is an additional variable \textit{scat}. \par
+      While the paper that the implementations ware based of included both a sun and sky glint correction. In consultation with Team Wombats, we have only implemented sky glint correction as an appropriate source of wind speed data has not been identified, as well as the fact that more work is required to develop an appropriate method that accounts for the high spatial variability of wind speed. \par
+      As for sky glint correction, a value of 1.34 for the refractive water index has been hardcoded. If desirable, the refractive water index can be added to the command line. Alternatively, wagl can be imported as a standard Python module, and the functions separately and define a value for the refractive water index as a keyword argument. \par
+      We were provided with outputs from a sample dataset to use as a comparison, but we were unable to get a satisfyingly close value on a simple image difference. As such, we then turned to the sample code that was provided and found that there is an additional variable \textit{scat}. \par
 \(\phantom{0}\)
       \par
       The paper used this equation: 
@@ -107,7 +107,7 @@
     \end{equation}
 
     \begin{flushleft}
-      Equation~\ref{eq:2} yielded results that were slightly closer to the sample dataset, but still not the same. Despite the difference in results, equation~\ref{eq:2} has been implemented and is now used by the workflow.
+      Equation~\ref{eq:2} yielded results that were slightly closer to the sample dataset, but still not the same. Despite the difference in results, equation~\ref{eq:2} has been implemented and is in use by the workflow.
     \end{flushleft}
 
   \section{Outputs}
@@ -115,7 +115,7 @@
     \subsection{Sample package}
 
     \begin{flushleft}
-      The current output package is not a representation of the final package. Additional work is required in order to determine the minimum requirements that meet the need for downstream aplications relying on the atmospheric correction over water product. \par
+      The current output package is not a representation of the final package. Additional work is required to determine the minimum requirements that meet the need for downstream applications relying on the atmospheric correction over water product. \par
       The test output package contains:
     \end{flushleft}
 
@@ -137,7 +137,7 @@
 
     \begin{flushleft}
       The outputs will be made available via an opendatacube instance, and the database location and product name will be provided soon. At this stage, the access will be via NCI, but if desireable, some work could be done to make the data available via an EC2 \url{https://aws.amazon.com/ec2/} instance on Amazon Web Services \url{https://aws.amazon.com/} running opendatacube. \par
-      Whilst the paper mentioned not applying the point spread function to channels measuring across the SWIR domain, we decided not inlcude that logic here. The reasoning was mostly a consideration of timing constraints, however, if desired for the next phase of testing and validation, this work can be done. But it may also depend on defining what is required to be contained within the \textit{atmospheric correction over water} product and what processes are to be applied to each channel. \par
+      While the paper mentioned not applying the point spread function to channels measuring across the SWIR domain, we decided not to include that logic here. The reasoning was mostly a consideration of timing constraints; however, if desired for the next phase of testing and validation, this work can be done. But it may also depend on defining what is required to be contained within the \textit{atmospheric correction over water} product and what processes are to be applied to each channel. \par
 
     \clearpage
 
@@ -196,7 +196,7 @@
     \subsection{Processing comparison of convolution methods}
 
     \begin{flushleft}
-      In total, 16 acquisitions across four different sensors were used for testing not just the algorithmic additions, but also the framework and its ability to be applied generally across different satellite acquisitions and different resolutions. The acquisitions tested are listed below:
+      In total, 16 acquisitions across four different sensors were used for testing, not just the algorithmic additions, but also the framework and its ability to be applied generally across different satellite acquisitions and different resolutions. The acquisitions tested are listed below:
     \end{flushleft}
 
       \begin{enumerate}
@@ -220,7 +220,7 @@
 
     \begin{flushleft}
       The first comparison is looking at the processing efficiency and the memory overhead to get an idea of how much time is required for processing a batch of acquisitions, and the memory requirement which can limit how many acquisitions can be processed in parallel on a single node. \par
-      It should be noted that the following tables are not reporting the processing time and memory usage of convolution. The reported metrics are in fact of the entire workflow that outputs surface reflectance.
+      It should be noted that the following tables are not reporting the processing time and memory usage of convolution. The reported metrics are, in fact, of the entire workflow that outputs surface reflectance.
     \end{flushleft}
 
     \begin{table}[ht!]
@@ -234,7 +234,7 @@
     \end{table}
 
     \begin{flushleft}
-      As you can see, convolution via fourier is much more efficient both in processing time, and only slightly more efficient in memory usage. But I would like to point out that this is merely comparing the time taken and memory used for processing the test acquisitions as a single batch job. The assumption is that for the standard convolution processing, the bulk of the time would be taken up by processing the higher resolution channels.
+      As you can see, convolution via Fourier is much more efficient both in processing time, and only slightly more efficient in memory usage. But I would like to point out that this is merely comparing the time taken and memory used for processing the test acquisitions as a single batch job. The assumption is that for the standard convolution processing, the bulk of the time would be taken up by processing the higher-resolution channels.
     \end{flushleft}
 
     \begin{table}[ht!]
@@ -250,8 +250,8 @@
     \end{table}
 
     \begin{flushleft}
-      While the walltimes for ETM and MSI are longer than the 50 minutes walltime reported in Table~\ref{table:1}, it should be noted that the times reported are from singular job runs. For a more realistic estimate, each job should idealy be run about half a dozen times each and an aggregate time reported. Unfortunately, with the timing constraints of this project, this will suffice. If a more accurate estimate is desired, this can be done at a more convienient time. \par
-      It should also be noted that the reported memory use comes direct from the PBS job status report and not from a memory profiling tool. The reported memory use is determined by a job monitoring tool managed by NCI, and executed intermittently. As such, it will only be an estimate, and if a more accurate memory profile is desired, this can be done at a more convienient time.
+      While the wall times for ETM and MSI are longer than the 50 minutes wall time reported in Table~\ref{table:1}, it should be noted that the times reported are from singular job runs. For a more realistic estimate, each job should ideally be run about half a dozen times each and an aggregate time reported. Unfortunately, with the timing constraints of this project, this will suffice. If a more accurate estimate is desired, this can be done at a more convenient time. \par
+      It should also be noted that the reported memory use comes directly from the PBS job status report and not from a memory profiling tool. The reported memory use is determined by a job monitoring tool managed by NCI and executed intermittently. As such, it will only be an estimate, and if a more accurate memory profile is desired, this can be done at a more convenient time.
     \end{flushleft}
 
     \begin{table}[ht!]
@@ -267,15 +267,15 @@
     \end{table}
 
     \begin{flushleft}
-      From Table~\ref{table:3}, it is clear that there is a significant difference in walltime for those sensors that have higher resolution channels to process. With the MSI sensor topping the lot at just over 6.5 hours. \par
-      The processing times could be reduced in various ways, such as process each band independently, however in simply changing the method we can reduce the time significantly. Reducing the kernel size is another, however further testing on the impact of limiting the kernel size is required.
+      From Table~\ref{table:3}, it is clear that there is a significant difference in wall time for those sensors that have higher resolution channels to process. With the MSI sensor topping the lot at just over 6.5 hours. \par
+      The processing times could be reduced in various ways, such as process each band independently; however, in simply changing the method, we can reduce the time significantly. Reducing the kernel size is another, however further testing on the impact of limiting the kernel size is required.
     \end{flushleft}
 
     \subsection{Output comparison of convolution methods}
 
     \begin{flushleft}
-      The following section is a simple difference comparison of the two different methods of applying convolution. The idea being that if the results come out vastly different, or simply not to an acceptable standard, then the alternate method (in this case using Fourier) will simply be abandoned. \par
-      The image datasets that are being compared are all \textit{atmoshperic adjacency corrected lambertian reflectance}. If anything is wrong with this level of data output, then all datasets that use this as input are likely to be affected themselves.
+      The following section is a simple difference comparison of the two different methods of applying convolution. The idea being that if the results come out vastly different, or simply not to an acceptable standard, then the alternate method (in this case using Fourier) will be abandoned. \par
+      The image datasets that used for comparison are all \textit{atmoshperic adjacency corrected Lambertian reflectance}. If anything is wrong with this level of data output, then all datasets that use this as input are likely to be affected themselves.
     \end{flushleft}
 
     \begin{table}[ht!]
@@ -561,23 +561,23 @@
   \clearpage
 
     \begin{flushleft}
-      Of all the channels from each Satellite/Sensor combination, only two bands returned a difference in the comparison of atmospheric adjacency corrected lambertian reflectance using two different methods, \textit{standard convolution} and \textit{convolution via fourier}. The difference itself is very small, as is the tally of pixels that are different. \par
-      I would put these diffences down to standard floating point calculations, and if a 10000 scale factor is applied, the values will truncate to zero.
+      Of all the channels from each Satellite/Sensor combination, only two bands returned a difference in the comparison of atmospheric adjacency corrected Lambertian reflectance using two different methods, \textit{standard convolution} and \textit{convolution via fourier}. The difference itself is minimal, as is the tally of pixels that are different. \par
+      I would put these differences down to standard floating-point calculations, and if a 10000 scale factor is applied, the values will truncate to zero.
     \end{flushleft}
 
   \section{Recommendations}
 
     \begin{flushleft}
-      From the difference comparisons on the sample datasets, it is clear that we can achieve the same or otherwise a very very similar result to standard convolution when using convolution via fourier. \par
-      The metrics gathered from the each of the batch processing jobs clearly indicate the advantage in using convolution via fourier over standard convolution. Considering the size of the kernels could be quite large, we need to be considerate of the time it takes to process numerous datasets in an efficienct manner. We can get a massive saving on CPU time, thus reducing expenditure of KSU's. The additional memory required is not that significant, and in some cases less. \par
+      From the difference comparisons on the sample datasets, it is clear that we can achieve the same or otherwise a very very similar result to standard convolution when using convolution via Fourier. \par
+      The metrics gathered from each of the batch processing jobs indicate the advantage in using convolution via Fourier over standard convolution. Considering the size of the kernels could be quite large, we need to be considerate of the time it takes to process numerous datasets in an efficient manner. We can get a massive saving on CPU time, thus reducing the expenditure of KSU's. The additional memory required is not that significant, and in some cases, less. \par
       Kicking off a test job is fairly trivial, so much so that other users could do this themselves if they have additional test areas of interest.
     \end{flushleft}
 
   \section{Next steps}
 
     \begin{flushleft}
-      Sample data can now be produced on large scale, with different configurations. In order to orogress the development of a product standard, additional validation and testing is required. I would highly recommend that the previous validation exercise undertaken with CSIRO be re-visited and re-run against data produced by the \textit{wagl} codebase. This work should involve the Calibration/Validation team, who would be expected to document the procedure and enable it to be easily re-evaluated when required, as well as to collate and manage any ground truth data. \par
-      For the product to be finalised in preperation for production, work is required to determine the required level of processing for the majority of downstream applications to take advantage of an Analysis Ready Data concept. \par
+      Sample data can now be produced on a large scale, with different configurations. To progress the development of a standard packaged product, additional validation and testing are required. I would highly recommend that the previous validation exercise undertaken with CSIRO be re-visited and re-run against data produced by the \textit{wagl} codebase. This work should involve the Calibration/Validation team, who would be expected to document the procedure and enable the work to be more easily re-evaluated when required, as well as to collate and manage any ground truth data. \par
+      For the product to be finalised for a production environment, work is needed to determine the required level of processing for the majority of downstream applications to take advantage of an Analysis Ready Data concept. \par
 
       Requirements such as:
     \end{flushleft}
