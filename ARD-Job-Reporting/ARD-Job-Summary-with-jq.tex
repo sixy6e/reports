@@ -312,4 +312,36 @@
 /g/data/da82/AODH/USGS/L1/Landsat/C1/094_077/LE70940772019273/LE07_L1TP_094077_20190930_20191027_01_T1.tar
     \end{lstlisting}
 
+    \begin{flushleft}
+      For debugging purposes, the traceback and stacktrace are included in the log file.  The following query outputs the traceback, exception and the Level-1 pathname: \par
+      \textit{{\tiny jq select(.status == "failure") |
+      {level1: .level1, exception: .exception, traceback: .traceback} task-log.jsonl}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+{
+  "level1": "/g/data/da82/AODH/USGS/L1/Landsat/C1/091_084/LC80910842015025LGN02/LC08_L1TP_091084_20150125_20180203_01_T1.tar",
+  "exception": "[Errno 39] Directory not empty: '/g/data/xu18/ga/.odcdataset-z9qqc37z' -> '/g/data/xu18/ga/ga_ls8c_ard_3/091/084/2015/01/25'",
+  "traceback": [
+    "Traceback (most recent call last):",
+    "  File \"/g/data/v10/private/modules/wagl/5.4.1/lib/python3.6/site-packages/luigi-3.0.0-py3.6.egg/luigi/worker.py\", line 191, in run",
+    "    new_deps = self._run_get_new_deps()",
+    "  File \"/g/data/v10/private/modules/wagl/5.4.1/lib/python3.6/site-packages/luigi-3.0.0-py3.6.egg/luigi/worker.py\", line 133, in _run_get_new_deps",
+    "    task_gen = self.task.run()",
+    "  File \"/g/data/v10/private/modules/wagl/5.4.1/lib/python3.6/site-packages/tesp-0.6.2-py3.6.egg/tesp/workflow.py\", line 212, in run",
+    "    self.products)",
+    "  File \"/g/data/v10/private/modules/wagl/5.4.1/lib/python3.6/site-packages/eodatasets3-0.9.2-py3.6.egg/eodatasets3/wagl.py\", line 563, in package",
+    "    return p.done()",
+    "  File \"/g/data/v10/private/modules/wagl/5.4.1/lib/python3.6/site-packages/eodatasets3-0.9.2-py3.6.egg/eodatasets3/assemble.py\", line 750, in done",
+    "    self._work_path.rename(self._dataset_location)",
+    "  File \"/g/data/v10/public/modules/dea-env/20190329/lib/python3.6/pathlib.py\", line 1309, in rename",
+    "    self._accessor.rename(self, target)",
+    "  File \"/g/data/v10/public/modules/dea-env/20190329/lib/python3.6/pathlib.py\", line 393, in wrapped",
+    "    return strfunc(str(pathobjA), str(pathobjB), *args)",
+    "OSError: [Errno 39] Directory not empty: '/g/data/xu18/ga/.odcdataset-z9qqc37z' -> '/g/data/xu18/ga/ga_ls8c_ard_3/091/084/2015/01/25'"
+  ]
+}
+
+    \end{lstlisting}
+
 \end{document}
