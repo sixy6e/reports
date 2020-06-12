@@ -1,0 +1,315 @@
+\documentclass[a4paper,oneside,titlepage]{article}
+
+\usepackage{array}
+\usepackage{listings}
+\usepackage{appendix}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{numprint}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage[T1]{fontenc}
+\usepackage{a4wide}
+\usepackage{xcolor}
+
+\colorlet{punct}{red!60!black}
+\definecolor{background}{HTML}{EEEEEE}
+\definecolor{delim}{RGB}{20,105,176}
+\colorlet{numb}{magenta!60!black}
+
+\lstdefinelanguage{json}{
+    basicstyle=\tiny\ttfamily,
+    showstringspaces=false,
+    breaklines=true,
+    frame=lines,
+    literate=
+     *{0}{{{\color{numb}0}}}{1}
+      {1}{{{\color{numb}1}}}{1}
+      {2}{{{\color{numb}2}}}{1}
+      {3}{{{\color{numb}3}}}{1}
+      {4}{{{\color{numb}4}}}{1}
+      {5}{{{\color{numb}5}}}{1}
+      {6}{{{\color{numb}6}}}{1}
+      {7}{{{\color{numb}7}}}{1}
+      {8}{{{\color{numb}8}}}{1}
+      {9}{{{\color{numb}9}}}{1}
+      {:}{{{\color{punct}{:}}}}{1}
+      {,}{{{\color{punct}{,}}}}{1}
+      {\{}{{{\color{delim}{\{}}}}{1}
+      {\}}{{{\color{delim}{\}}}}}{1}
+      {[}{{{\color{delim}{[}}}}{1}
+      {]}{{{\color{delim}{]}}}}{1},
+}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,
+  urlcolor=cyan,
+}
+
+\title{Summarising Processed ARD Jobs}
+\date{10 June 2020}
+\author{Analysis Read Data\\ Pipelines and Data Workflows Team}
+
+\begin{document}
+  \pagenumbering{gobble}
+  \maketitle
+  \newpage
+  \pagenumbering{arabic}
+
+  \tableofcontents
+
+  \newpage
+
+  \section{Background}
+
+    \begin{flushleft}
+      The ARD processing pipeline was designed as a batch processing system, where each new request to process is considered a new batch. \par
+      Within any given batch, the requester can ask for multiple nodes on NCI whereby the batch, list of Level-1 datasets, are scattered evenly across the requested number of nodes. \par
+      Currently, the only summary that occurs is an output of three files containing the names:
+    \end{flushleft}
+
+    \begin{itemize}
+      \item Done
+      \item Pending
+      \item Failed
+    \end{itemize}
+
+    \begin{flushleft}
+      Each textfile represents a list of Level-1 datasets that have either finished processing, failed, or not finished (pending). \par
+      The information isn't exactly comprehensive, but the idea at the time was sufficient to supply an operator or messaging system, to signify completion for follow-on processes; failed and requires further investigation; or a list of datasets that can be immediately submitted for processing as a new batch job. \par
+      However, the logging framework of the ARD pipeline was designed around the ability to query logging records using a tool called jq \url{https://stedolan.github.io/jq/}. \par
+      This provided the groundwork from which enhancements to the pipeline could be made when additional resources become available. It also enables the Operations Team to query log records for general purpose house keeping and easier debugging for development purposes.
+    \end{flushleft}
+
+  \section{ARD Pipeline Structure}
+
+    \begin{flushleft}
+      The ARD Pipeline \href{https://github.com/OpenDataCubePipelines/tesp}{tesp}, was designed as a batch processing system, where each new request to process a granule or a list of granules, is a new batch. \par
+      A batch comprises of 1 or more compute nodes, where each node runs its own \href{https://luigi.readthedocs.io/en/stable/}{luigi} scheduler that monitors and schedules the tasks necessary to produce ARD. \par
+      The base tasks to compute for each granule are as follows:
+    \end{flushleft}
+
+    \begin{itemize}
+      \item DataStandardisation
+      \item Fmask
+      \item GQATask
+      \item GverifyTask
+      \item Packaging
+    \end{itemize}
+
+    \begin{flushleft}
+      To provide clarity on task depdendencies, we'll start at the bottom of the tree. \par
+      The \textit{Packaging} task will not execute until the tasks \textit{GverifyTask, GQATask, Fmask and DataStandardisation} have run and are successful. \par
+      \textit{GverifyTask, GQATask, Fmask} tasks all depend in the \textit{DataStandardisation} task finishing successfully. \par
+      What this means is that the \textit{DataStandardisation} task is the first to be run, and nothing else will start until it finishes successfully. As such, the logging output will not report on tasks that have failed, or succeeded if they haven't actually run.
+    \end{flushleft}
+
+    \begin{flushleft}
+      The pipeline has been configured so that the luigi scheduler records task history information into an SQLlite database named \textit{luigi-task-hist.db}. \par
+      When the batch job has finished, the databases are interrogated and produce a basic job summary on the status of each granule processed. \par
+      This is what produces the following 3 text files:
+    \end{flushleft}
+
+    \begin{itemize}
+      \item level-1-done.txt
+      \item level-1-failed.txt
+      \item level-1-pending.txt
+    \end{itemize}
+
+    \begin{flushleft}
+      The luigi task history database also contains contextual information on why tasks may have failed, for those interrested in working directly with the SQLlite database. \par
+      The pipeline has also been designed so that on a successful completion of a task, luigi emits a record to a JSON Lines logfile, as well as for any failed task. Failed tasks emit a record that includes the traceback, stackinfo, and any exception message. \par
+      The creation of a JSON Lines file makes it easier for users to directly view the contents via a text editor, forgoing the need for a tool to view the task history database. \par
+      Currently, the ARD Pipeline is making use of \href{https://www.structlog.org/en/stable/}{structlog} to configure and enable the logging of events as JSON records, thus enabling users to query log events using a tool such as jq. \par
+      The logfile of interest output from the ARD Pipeline is named \textit{task-log.jsonl}.
+    \end{flushleft}
+
+  \section{Querying Log Records}
+
+    \begin{flushleft}
+      The NCI module \textit{wagl/5.4.1} already has jq installed, so executing \textit{module load wagl/5.4.1} will make jq available to the user. \par
+      The following sets of queries can be used as a sequence of steps in undertaking a quick summary interrogation of a batch job.
+    \end{flushleft}
+
+    \begin{flushleft}
+      The following query is essentially a job summary reporting the counts of success:
+    \end{flushleft}
+
+    \begin{flushleft}
+      \textit{{\tiny jq 'select(.status == "success") |
+      \{task, level1\} ' task-log.jsonl |
+      jq --slurp 'unique\_by(.level1, .task) |
+      group\_by(.task) |
+      map(\{task: .[0].task, count: length\})'}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+[
+  {
+    "task": "DataStandardisation",
+    "count": 41
+  },
+  {
+    "task": "GQATask",
+    "count": 41
+  },
+  {
+    "task": "GverifyTask",
+    "count": 41
+  },
+  {
+    "task": "Package",
+    "count": 3
+  },
+  {
+    "task": "RunFmask",
+    "count": 41
+  }
+]
+    \end{lstlisting}
+
+    \begin{flushleft}
+      From the above output, there are 41 granules that finshed the \textit{DataStandardisation}, \textit{GQATask}, \textit{GverifyTask} and \textit{RunFmask} tasks, whereas the \textit{Package} task had only 3 granules finish. \par
+      This suggests an error occuring within the \textit{Package} task. \par
+      Running a similar query and substituting \textit{success} with \textit{failure} results in:
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+[
+  {
+    "task": "DataStandardisation",
+    "count": 19
+  },
+  {
+    "task": "Package",
+    "count": 38
+  }
+]
+    \end{lstlisting}
+
+    \begin{flushleft}
+      What this means is that 38 \textit{Package} tasks failed, and so did 19 \textit{DataStandardisation} tasks. \par
+      So in total, 60 granules were submitted, (41 + 19) as tallied by the \textit{DataStandardisation} task.
+    \end{flushleft}
+
+    \begin{flushleft}
+      The following query selects all records that have the \textit{status} field containing \textit{failure}, i.e. failed tasks, and outputs a JSON listing of the Level-1 input pathname, and the exception. \par
+      \textit{{\tiny jq 'select(.status == "failure") | {level1: .level1, exception: .exception}' task-log.jsonl}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+{
+  "level1": "LC08_L1GT_088077_20150309_20180203_01_T2.tar",
+  "exception": "Requested Subset Does Not Intersect With Array"
+}
+{
+  "level1": "LE07_L1TP_094080_20200308_20200404_01_T1.tar",
+  "exception": "Unable to open file (unable to open file: name = 'pr_wtr.eatm.2020.h5',
+  errno = 13, error message = 'Permission denied', flags = 0, o_flags = 0)"
+}
+{
+  "level1": "LE07_L1TP_096081_20031222_20170123_01_T1.tar",
+  "exception": "[Errno 39] Directory not empty: 'jq-tests/pkgdir/.odcdataset-hai017xu'
+  -> 'jq-tests/pkgdir/ga_ls7e_ard_3/096/081/2003/12/22'"
+}
+    \end{lstlisting}
+
+    \begin{flushleft}
+      Now we can expand on the query to provide additional information, such as what task the error occurred in. \par
+      \textit{{\tiny jq 'select(.status == "failure") | {level1: .level1, exception: .exception, task: .task}' task-log.jsonl}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+{
+  "level1": "LC08_L1GT_088077_20150309_20180203_01_T2.tar",
+  "exception": "Requested Subset Does Not Intersect With Array",
+  "task": "DataStandardisation"
+}
+{
+  "level1": "LE07_L1TP_094080_20200308_20200404_01_T1.tar",
+  "exception": "Unable to open file (unable to open file: name = 'pr_wtr.eatm.2020.h5',
+  errno = 13, error message = 'Permission denied', flags = 0, o_flags = 0)",
+  "task": "DataStandardisation"
+}
+{
+  "level1": "LE07_L1TP_096081_20031222_20170123_01_T1.tar",
+  "exception": "[Errno 39] Directory not empty: 'jq-tests/pkgdir/.odcdataset-hai017xu'
+  -> 'jq-tests/pkgdir/ga_ls7e_ard_3/096/081/2003/12/22'",
+  "task": "Package"
+}
+    \end{lstlisting}
+
+    \begin{flushleft}
+      More complex queries can be constructed, such as get a unique count of all exceptions. \par
+      \textit{{\tiny jq 'select(.status == "failure") |
+      {task, level1, exception} ' task-log.jsonl |
+      jq --slurp 'unique\_by(.level1, .task, .exception) |
+      group\_by(.exception, .task) |
+      map({exception: .[0].exception, count: length, task: .[0].task})'}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+[
+  {
+    "exception": "Requested Subset Does Not Intersect With Array",
+    "count": 9,
+    "task": "DataStandardisation"
+  },
+  {
+    "exception": "Unable to open file (unable to open file: name = 'pr_wtr.eatm.2020.h5',
+    errno = 13, error message = 'Permission denied', flags = 0, o_flags = 0)",
+    "count": 10,
+    "task": "DataStandardisation"
+  },
+  {
+    "exception": "[Errno 39] Directory not empty: 'jq-tests/pkgdir/.odcdataset-04io7y6f'
+    -> 'jq-tests/pkgdir/ga_ls7e_ard_3/095/074/2005/12/04'",
+    "count": 1,
+    "task": "Package"
+  },
+  {
+    "exception": "[Errno 39] Directory not empty: 'jq-tests/pkgdir/.odcdataset-09alscsi'
+    -> 'jq-tests/pkgdir/ga_ls7e_ard_3/096/081/2018/01/29'",
+    "count": 1,
+    "task": "Package"
+  },
+]
+    \end{lstlisting}
+
+    \begin{flushleft}
+      From the above output, there are 9 counts of \textit{Requested Subset Does Not Intersect With Array} and 10 counts of \textit{Unable to open file ...}, and multiple counts of 1 for \textit{[Errno 39] Directory not empty}. \par
+      Why multiple counts of 1? Because the actual message is unique as it contains a unique directory name.
+      The following query, summarises only those exceptions containing \textit{Directory not empty}. \par
+      \textit{{\tiny jq 'select(.status == "failure") |
+      {level1: .level1, exception: .exception} |
+      select(.exception | contains("[Errno 39] Directory not empty")) |
+      .level1' task-log.jsonl | jq -sr 'unique |
+      {exception: "[Errno 39] Directory not empty", count: length}'}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+{
+  "exception": "[Errno 39] Directory not empty",
+  "count": 38
+}
+    \end{lstlisting}
+
+    \begin{flushleft}
+      Lists of Level-1 file pathnames can also be generated, such as the Level-1 files that are associated with the above grouped error \textit{Directory not empty}. \par
+      \textit{{\tiny jq 'select(.status == "failure") |
+      {level1: .level1, exception: .exception} |
+      select(.exception | contains("[Errno 39] Directory not empty")) |
+      .level1' task-log.jsonl | jq -sr 'unique | .[]'}}
+    \end{flushleft}
+
+    \begin{lstlisting}[basicstyle=\tiny, language=json]
+/g/data/da82/AODH/USGS/L1/Landsat/C1/089_086/LE70890862015179/LE07_L1TP_089086_20150628_20161024_01_T1.tar
+/g/data/da82/AODH/USGS/L1/Landsat/C1/089_086/LE70890862019350/LE07_L1TP_089086_20191216_20200112_01_T1.tar
+/g/data/da82/AODH/USGS/L1/Landsat/C1/094_077/LE70940772019241/LE07_L1TP_094077_20190829_20190924_01_T1.tar
+/g/data/da82/AODH/USGS/L1/Landsat/C1/094_077/LE70940772019273/LE07_L1TP_094077_20190930_20191027_01_T1.tar
+    \end{lstlisting}
+
+\end{document}
