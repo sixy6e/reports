@@ -78,7 +78,7 @@
     \end{itemize}
 
     \begin{flushleft}
-      Each textfile represents a list of Level-1 datasets that have either finished processing, failed, or not finished (pending). \par
+      Each text file represents a list of Level-1 datasets that have either finished processing, failed, or not finished (pending). \par
       The information isn't exactly comprehensive, but the idea at the time was sufficient to supply an operator or messaging system, to signify completion for follow-on processes; failed and requires further investigation; or a list of datasets that can be immediately submitted for processing as a new batch job. \par
       However, the logging framework of the ARD pipeline was designed around the ability to query logging records using a tool called jq \url{https://stedolan.github.io/jq/}. \par
       This provided the groundwork from which enhancements to the pipeline could be made when additional resources become available. It also enables the Operations Team to query log records for general purpose house keeping and easier debugging for development purposes.
@@ -101,7 +101,7 @@
     \end{itemize}
 
     \begin{flushleft}
-      To provide clarity on task depdendencies, we'll start at the bottom of the tree. \par
+      To provide clarity on task dependencies, we'll start at the bottom of the tree. \par
       The \textit{Packaging} task will not execute until the tasks \textit{GverifyTask, GQATask, Fmask and DataStandardisation} have run and are successful. \par
       \textit{GverifyTask, GQATask, Fmask} tasks all depend in the \textit{DataStandardisation} task finishing successfully. \par
       What this means is that the \textit{DataStandardisation} task is the first to be run, and nothing else will start until it finishes successfully. As such, the logging output will not report on tasks that have failed, or succeeded if they haven't actually run.
@@ -120,7 +120,7 @@
     \end{itemize}
 
     \begin{flushleft}
-      The luigi task history database also contains contextual information on why tasks may have failed, for those interrested in working directly with the SQLlite database. \par
+      The luigi task history database also contains contextual information on why tasks may have failed, for those interested in working directly with the SQLlite database. \par
       The pipeline has also been designed so that on a successful completion of a task, luigi emits a record to a JSON Lines logfile, as well as for any failed task. Failed tasks emit a record that includes the traceback, stackinfo, and any exception message. \par
       The creation of a JSON Lines file makes it easier for users to directly view the contents via a text editor, forgoing the need for a tool to view the task history database. \par
       Currently, the ARD Pipeline is making use of \href{https://www.structlog.org/en/stable/}{structlog} to configure and enable the logging of events as JSON records, thus enabling users to query log events using a tool such as jq. \par
@@ -130,7 +130,7 @@
   \section{Querying Log Records}
 
     \begin{flushleft}
-      The NCI module \textit{wagl/5.4.1} already has jq installed, so executing \textit{module load wagl/5.4.1} will make jq available to the user. \par
+      The NCI module \textit{ard-pipeline/20201030} already has jq installed, so executing \textit{module load ard-pipeline/20201030} will make jq available to the user. \par
       The following sets of queries can be used as a sequence of steps in undertaking a quick summary interrogation of a batch job.
     \end{flushleft}
 
@@ -172,8 +172,8 @@
     \end{lstlisting}
 
     \begin{flushleft}
-      From the above output, there are 41 granules that finshed the \textit{DataStandardisation}, \textit{GQATask}, \textit{GverifyTask} and \textit{RunFmask} tasks, whereas the \textit{Package} task had only 3 granules finish. \par
-      This suggests an error occuring within the \textit{Package} task. \par
+      From the above output, there are 41 granules that finished the \textit{DataStandardisation}, \textit{GQATask}, \textit{GverifyTask} and \textit{RunFmask} tasks, whereas the \textit{Package} task had only 3 granules finish. \par
+      This suggests an error occurring within the \textit{Package} task. \par
       Running a similar query and substituting \textit{success} with \textit{failure} results in:
     \end{flushleft}
 
